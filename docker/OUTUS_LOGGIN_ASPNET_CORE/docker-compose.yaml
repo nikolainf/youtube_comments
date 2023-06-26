@@ -1,0 +1,59 @@
+version: '3.7'
+services:
+  Elasticsearch:
+    image: elasticsearch:7.16.2
+    container_name: elasticsearch_loggin
+    restart: always
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data/
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      discovery.type: single-node
+      xpack.security.enabled: false
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    networks:
+      - elk
+  apm-server:
+    image: elastic/apm-server:7.16.2
+    container_name: apm_loggin
+    depends_on:
+      - Elasticsearch
+      - Kibana
+    # depends_on:
+    #   elasticsearch:
+    #     condition: service_healthy
+    #   kibana:
+    #     condition: service_healthy
+    cap_add: [ "CHOWN", "DAC_OVERRIDE", "SETGID", "SETUID" ]
+    cap_drop: [ "ALL" ]
+    ports:
+      - 8200:8200
+    networks:
+      - elk
+    command: >
+      apm-server -e
+        -E apm-server.rum.enabled=true
+        -E setup.kibana.host=kibana:5601
+        -E setup.template.settings.index.number_of_replicas=0
+        -E apm-server.kibana.enabled=true
+        -E apm-server.kibana.host=kibana:5601
+        -E output.elasticsearch.hosts=["elasticsearch:9200"]
+  Kibana:
+    image: kibana:7.16.2
+    container_name: kibana_loggin
+    restart: always
+    ports:
+      - '5601:5601'
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - Elasticsearch
+    networks:
+      - elk
+volumes:
+  elastic_data: {}
+
+networks:
+  elk:
